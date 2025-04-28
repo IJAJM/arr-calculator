@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Advanced Risk vs Return Calculator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-6 space-y-10">
+
+  <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-xl">
+    <h1 class="text-2xl font-bold text-center text-indigo-700 mb-6">Advanced Risk vs Return Calculator</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <label for="returnMin" class="block mb-1 text-gray-700 font-semibold">Return Minimal (%)</label>
+        <input id="returnMin" type="number" placeholder="Return Minimum" class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      </div>
+      <div>
+        <label for="returnMax" class="block mb-1 text-gray-700 font-semibold">Return Maksimal (%)</label>
+        <input id="returnMax" type="number" placeholder="Return Maksimum" class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      </div>
+      <div>
+        <label for="risk" class="block mb-1 text-gray-700 font-semibold">Risiko (%)</label>
+        <input id="risk" type="number" placeholder="Risiko %" class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      </div>
+      <div>
+        <label for="years" class="block mb-1 text-gray-700 font-semibold">Jangka Waktu (Tahun)</label>
+        <input id="years" type="number" placeholder="Jangka waktu (Tahun)" class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      </div>
+      <div>
+        <label for="interest" class="block mb-1 text-gray-700 font-semibold">Bunga Tahunan (%)</label>
+        <input id="interest" type="number" placeholder="Bunga tahunan (%)" class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      </div>
+    </div>
+
+    <button onclick="calculate()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg mt-6">Hitung</button>
+
+    <div id="result" class="mt-8 text-center hidden">
+      <h2 class="text-xl font-bold mb-2 text-gray-800">Profil Risiko Anda</h2>
+      <p id="profile" class="text-lg text-gray-600"></p>
+    </div>
+
+    <button onclick="downloadPDF()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg mt-6 hidden" id="downloadBtn">Download PDF</button>
+  </div>
+
+  <!-- Chart Containers -->
+  <div class="bg-white p-6 rounded-2xl shadow-lg w-full max-w-xl">
+    <h3 class="text-center text-xl font-semibold mb-4 text-indigo-700">Grafik Risiko vs Return</h3>
+    <canvas id="pieChart" class="mb-8"></canvas>
+    <canvas id="radarChart"></canvas>
+  </div>
+
+  <script>
+    let pieChart = null;
+    let radarChart = null;
+
+    function calculate() {
+      const returnMin = parseFloat(document.getElementById('returnMin').value);
+      const returnMax = parseFloat(document.getElementById('returnMax').value);
+      const risk = parseFloat(document.getElementById('risk').value);
+      const years = parseFloat(document.getElementById('years').value);
+      const interest = parseFloat(document.getElementById('interest').value);
+      const profileDiv = document.getElementById('result');
+      const profileText = document.getElementById('profile');
+      const downloadBtn = document.getElementById('downloadBtn');
+
+      if (isNaN(returnMin) || isNaN(returnMax) || isNaN(risk) || isNaN(years) || isNaN(interest)) {
+        alert('Semua input harus angka valid!');
+        return;
+      }
+
+      // Rata-rata return
+      const avgReturn = (returnMin + returnMax) / 2;
+
+      // Menentukan profil risiko
+      let profile = '';
+      const ratio = avgReturn / risk;
+
+      if (ratio > 2) {
+        profile = 'Aggressive Investor (High Return, Controlled Risk)';
+      } else if (ratio > 1) {
+        profile = 'Moderate Investor (Balanced Risk and Return)';
+      } else {
+        profile = 'Defensive Investor (Low Risk Preference)';
+      }
+
+      profileDiv.classList.remove('hidden');
+      profileText.textContent = profile;
+
+      // Simulasi Pertumbuhan Uang
+      const finalAmount = calculateGrowth(1000, interest, years); // Anggap modal awal 1000
+      profileText.innerHTML += `<br/><br/>Jumlah akhir investasi setelah ${years} tahun: Rp ${finalAmount.toFixed(2)}`;
+
+      // Update PIE Chart
+      if (pieChart) {
+        pieChart.destroy();
+      }
+      const pieCtx = document.getElementById('pieChart').getContext('2d');
+      pieChart = new Chart(pieCtx, {
+        type: 'pie',
+        data: {
+          labels: ['Return Minimum', 'Return Maksimal', 'Risk'],
+          datasets: [{
+            data: [returnMin, returnMax, risk],
+            backgroundColor: [
+              'rgba(16, 185, 129, 0.7)', // green
+              'rgba(59, 130, 246, 0.7)', // blue
+              'rgba(239, 68, 68, 0.7)'   // red
+            ],
+            borderColor: [
+              'rgba(16, 185, 129, 1)',
+              'rgba(59, 130, 246, 1)',
+              'rgba(239, 68, 68, 1)'
+            ],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+        }
+      });
+
+      // Update RADAR Chart
+      if (radarChart) {
+        radarChart.destroy();
+      }
+      const radarCtx = document.getElementById('radarChart').getContext('2d');
+      radarChart = new Chart(radarCtx, {
+        type: 'radar',
+        data: {
+          labels: ['Return Minimum', 'Return Maksimal', 'Risk'],
+          datasets: [{
+            label: 'Risk Profile',
+            data: [returnMin, returnMax, risk],
+            backgroundColor: 'rgba(99, 102, 241, 0.2)',
+            borderColor: 'rgba(99, 102, 241, 1)',
+            borderWidth: 2,
+            pointBackgroundColor: 'rgba(99, 102, 241, 1)'
+          }]
+        },
+        options: {
+          scales: {
+            r: {
+              angleLines: { display: true },
+              suggestedMin: 0
+            }
+          }
+        }
+      });
+
+      downloadBtn.classList.remove('hidden');
+    }
+
+    // Fungsi simulasi pertumbuhan uang (bunga majemuk tahunan)
+    function calculateGrowth(principal, rate, years) {
+      return principal * Math.pow((1 + rate / 100), years);
+    }
+
+    // Export ke PDF
+    function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const profileText = document.getElementById('profile').textContent;
+      const finalAmount = document.querySelector('#profile').innerText.split("Rp")[1];
+      
+      doc.text('Hasil Simulasi Risiko vs Return', 20, 10);
+      doc.text(`Profil Risiko: ${profileText}`, 20, 20);
+      doc.text(`Jumlah Akhir Investasi: Rp ${finalAmount}`, 20, 30);
+      
+      doc.save('Hasil_Simulasi.pdf');
+    }
+  </script>
+
+</body>
+</html>
